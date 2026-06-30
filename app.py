@@ -5,13 +5,30 @@ import pandas as pd
 import pickle
 import numpy as np
 import matplotlib.pyplot as plt
-from datetime import datetime
 
 st.set_page_config(
     page_title="Service Excellence Prediction System",
     page_icon="📊",
     layout="wide"
 )
+
+st.markdown("""
+<style>
+div[data-testid="stMetricValue"] {
+    font-size: 24px !important;
+}
+div[data-testid="stMetricLabel"] {
+    font-size: 13px !important;
+}
+.tier-box {
+    padding: 10px;
+    border-radius: 6px;
+    font-size: 18px;
+    font-weight: 700;
+    text-align: center;
+}
+</style>
+""", unsafe_allow_html=True)
 
 # Load data
 conn = sqlite3.connect("hotel_employees.db")
@@ -22,57 +39,65 @@ conn.close()
 with open("employee_performance_model.pkl", "rb") as f:
     model = pickle.load(f)
 
-# App Header
+# Add real demo employee names and departments
+names = [
+    "Alicia Carter", "Marcus Johnson", "Taylor Brooks", "Jordan Williams",
+    "Sophia Martinez", "Brandon Lee", "Danielle Parker", "Christopher Allen",
+    "Maya Thompson", "Derrick Harris", "Natalie Reed", "Kevin Morgan",
+    "Jasmine Scott", "Anthony Bell", "Brianna Cooper", "Malik Robinson",
+    "Olivia Bennett", "Caleb Turner", "Naomi Foster", "Isaiah Mitchell"
+]
+
+departments = [
+    "Front Desk", "Housekeeping", "Maintenance", "Valet",
+    "Janitorial", "Restaurant", "Breakfast", "Guest Services"
+]
+
+employee_data = employee_data.reset_index(drop=True)
+employee_data["Employee ID"] = employee_data.index + 1001
+employee_data["Employee Name"] = [names[i % len(names)] for i in range(len(employee_data))]
+employee_data["Department"] = [departments[i % len(departments)] for i in range(len(employee_data))]
+
+def get_status(score):
+    if score < 70:
+        return "Below Requirements", "red"
+    elif score < 85:
+        return "Needs Improvement", "#D4A017"
+    else:
+        return "At or Above Expectations", "green"
+
 st.title("📊 Service Excellence Prediction System")
 st.caption("A Workforce Analytics Platform for Hospitality Operations")
 
-st.markdown(
-    """
-    This dashboard predicts employee performance using attendance, task completion, 
-    and customer service metrics. It also provides promotion readiness, merit increase 
-    guidance, and operational recommendations.
-    """
+st.write(
+    "This dashboard predicts employee performance using attendance, task completion, "
+    "and customer service metrics. It also provides promotion readiness, merit increase "
+    "guidance, and operational recommendations."
 )
 
 # Sidebar
 st.sidebar.header("Employee Selection")
-employee_names = employee_data["name"].tolist()
-selected_employee = st.sidebar.selectbox("Choose an employee", employee_names)
+selected_employee = st.sidebar.selectbox(
+    "Choose an employee",
+    employee_data["Employee Name"].tolist()
+)
 
-employee = employee_data[employee_data["name"] == selected_employee].iloc[0]
+employee = employee_data[employee_data["Employee Name"] == selected_employee].iloc[0]
 
-# Inputs
 st.sidebar.header("Adjust Performance Metrics")
 
-new_attendance = st.sidebar.slider(
-    "Attendance %",
-    min_value=60,
-    max_value=100,
-    value=int(employee["attendance"])
-)
-
-new_task_completion = st.sidebar.slider(
-    "Task Completion %",
-    min_value=50,
-    max_value=100,
-    value=int(employee["task_completion"])
-)
-
-new_customer_service = st.sidebar.slider(
-    "Customer Service %",
-    min_value=40,
-    max_value=100,
-    value=int(employee["customer_service"])
-)
+new_attendance = st.sidebar.slider("Attendance %", 60, 100, int(employee["attendance"]))
+new_task_completion = st.sidebar.slider("Task Completion %", 50, 100, int(employee["task_completion"]))
+new_customer_service = st.sidebar.slider("Customer Service %", 40, 100, int(employee["customer_service"]))
 
 # Prediction
 predicted_performance = model.predict(
     [[new_attendance, new_task_completion, new_customer_service]]
 )[0]
-
 predicted_performance = float(np.clip(predicted_performance, 0, 100))
 
-# Derived scores
+performance_tier, tier_color = get_status(predicted_performance)
+
 promotion_readiness = round(
     (new_attendance * 0.25)
     + (new_task_completion * 0.35)
@@ -80,109 +105,112 @@ promotion_readiness = round(
     2
 )
 
-if predicted_performance >= 90:
-    performance_tier = "Elite Performer"
-    merit_increase = "5% - 7%"
-    recommendation = "Strong candidate for promotion, leadership development, or expanded responsibility."
-elif predicted_performance >= 85:
-    performance_tier = "High Performer"
-    merit_increase = "3% - 5%"
-    recommendation = "Consider for merit increase, cross-training, or advancement planning."
-elif predicted_performance >= 75:
-    performance_tier = "Solid Performer"
-    merit_increase = "1% - 3%"
-    recommendation = "Maintain current role while providing coaching for continued growth."
-else:
-    performance_tier = "Development Needed"
+if predicted_performance < 70:
     merit_increase = "0% - 1%"
-    recommendation = "Create a performance improvement plan focused on attendance, service, and task execution."
+    recommendation = "Create a performance improvement plan focused on attendance, task completion, and customer service."
+elif predicted_performance < 85:
+    merit_increase = "1% - 3%"
+    recommendation = "Provide coaching, follow-up training, and measurable short-term goals."
+else:
+    merit_increase = "3% - 7%"
+    recommendation = "Strong performer. Consider recognition, advancement planning, or leadership development."
 
-# KPI Cards
+# KPI cards
 col1, col2, col3, col4 = st.columns(4)
 
 col1.metric("Predicted Performance", f"{predicted_performance:.2f}%")
 col2.metric("Promotion Readiness", f"{promotion_readiness:.2f}%")
-col3.metric("Performance Tier", performance_tier)
+
+with col3:
+    st.markdown("**Performance Tier**")
+    st.markdown(
+        f"<div class='tier-box' style='background-color:{tier_color}; color:white;'>{performance_tier}</div>",
+        unsafe_allow_html=True
+    )
+
 col4.metric("Merit Increase Range", merit_increase)
 
 st.divider()
 
-# Employee Profile
+# Employee profile
 left, right = st.columns([1, 2])
 
 with left:
     st.subheader("Employee Profile")
-    st.write(f"**Name:** {selected_employee}")
-    st.write(f"**Role:** {employee['role']}")
+    st.write(f"**Employee Name:** {employee['Employee Name']}")
+    st.write(f"**Employee ID:** {employee['Employee ID']}")
+    st.write(f"**Department:** {employee['Department']}")
+    st.write(f"**Original Role:** {employee['role']}")
     st.write(f"**Sex:** {employee['sex']}")
     st.write(f"**Age:** {employee['age']} years")
     st.write(f"**Start Date:** {employee['start_date']}")
-    st.write(f"**Current Attendance:** {employee['attendance']}%")
-    st.write(f"**Current Task Completion:** {employee['task_completion']}%")
-    st.write(f"**Current Customer Service:** {employee['customer_service']}%")
+    st.write(f"**Attendance:** {employee['attendance']}%")
+    st.write(f"**Task Completion:** {employee['task_completion']}%")
+    st.write(f"**Customer Service:** {employee['customer_service']}%")
 
 with right:
     st.subheader("Prediction Explanation")
 
-    drivers = []
-
-    if new_attendance >= 90:
-        drivers.append("Attendance is a strong positive driver.")
-    elif new_attendance < 75:
-        drivers.append("Attendance is lowering the performance prediction.")
-
-    if new_task_completion >= 90:
-        drivers.append("Task completion shows strong operational consistency.")
-    elif new_task_completion < 75:
-        drivers.append("Task completion needs improvement.")
-
-    if new_customer_service >= 90:
-        drivers.append("Customer service is a key strength.")
-    elif new_customer_service < 75:
-        drivers.append("Customer service may be impacting the overall score.")
-
-    if not drivers:
-        drivers.append("Performance is balanced across attendance, task completion, and customer service.")
-
-    for item in drivers:
-        st.write(f"✅ {item}")
+    for label, score in {
+        "Attendance": new_attendance,
+        "Task Completion": new_task_completion,
+        "Customer Service": new_customer_service
+    }.items():
+        status, color = get_status(score)
+        st.markdown(
+            f"<span style='color:{color}; font-size:22px;'>●</span> "
+            f"**{label}:** {score}% — {status}",
+            unsafe_allow_html=True
+        )
 
     st.info(recommendation)
 
 st.divider()
 
-# Visuals
+# Charts
 chart_col1, chart_col2 = st.columns(2)
 
 with chart_col1:
     st.subheader("Adjusted Performance Metrics")
-    metrics_df = pd.DataFrame({
-        "Metric": ["Attendance", "Task Completion", "Customer Service"],
-        "Score": [new_attendance, new_task_completion, new_customer_service]
-    })
 
-    fig, ax = plt.subplots()
-    ax.bar(metrics_df["Metric"], metrics_df["Score"])
+    metrics = ["Attendance", "Task Completion", "Customer Service"]
+    scores = [new_attendance, new_task_completion, new_customer_service]
+    colors = [get_status(score)[1] for score in scores]
+
+    fig, ax = plt.subplots(figsize=(7, 4))
+    ax.bar(metrics, scores, color=colors)
     ax.set_ylim(0, 100)
+    ax.axhline(70, color="red", linestyle="--", label="Below Requirements")
+    ax.axhline(85, color="green", linestyle="--", label="At/Above Expectations")
     ax.set_ylabel("Score (%)")
-    ax.set_title("Current Adjusted Metrics")
+    ax.set_title("Adjusted Metrics by Performance Category")
+    ax.legend()
     st.pyplot(fig)
 
 with chart_col2:
     st.subheader("Performance Progression")
 
     months = np.arange(1, 13)
-    base_score = predicted_performance
     performance_progress = np.clip(
-        base_score + np.random.normal(0, 4, 12),
+        predicted_performance + np.random.normal(0, 4, 12),
         60,
         100
     )
 
-    fig2, ax2 = plt.subplots()
-    ax2.plot(months, performance_progress, marker="o")
-    ax2.axhline(85, linestyle="--", label="High Performance Threshold")
-    ax2.axhline(70, linestyle="--", label="Needs Improvement Threshold")
+    fig2, ax2 = plt.subplots(figsize=(7, 4))
+
+    for i in range(len(months) - 1):
+        color = get_status(performance_progress[i])[1]
+        ax2.plot(
+            months[i:i + 2],
+            performance_progress[i:i + 2],
+            marker="o",
+            linewidth=3,
+            color=color
+        )
+
+    ax2.axhline(70, color="red", linestyle="--", label="Below Requirements")
+    ax2.axhline(85, color="green", linestyle="--", label="At/Above Expectations")
     ax2.set_xlabel("Month")
     ax2.set_ylabel("Performance Score (%)")
     ax2.set_title(f"{selected_employee}'s Simulated Performance Trend")
@@ -191,35 +219,56 @@ with chart_col2:
 
 st.divider()
 
-# Team Overview
-st.subheader("Team Performance Overview")
-
-team_avg_attendance = employee_data["attendance"].mean()
-team_avg_tasks = employee_data["task_completion"].mean()
-team_avg_service = employee_data["customer_service"].mean()
-
-team_col1, team_col2, team_col3 = st.columns(3)
-
-team_col1.metric("Team Avg Attendance", f"{team_avg_attendance:.2f}%")
-team_col2.metric("Team Avg Task Completion", f"{team_avg_tasks:.2f}%")
-team_col3.metric("Team Avg Customer Service", f"{team_avg_service:.2f}%")
-
+# Ranking
 st.subheader("Employee Ranking Snapshot")
 
 ranking_df = employee_data.copy()
-ranking_df["estimated_score"] = (
+ranking_df["Estimated Score"] = (
     ranking_df["attendance"] * 0.30
     + ranking_df["task_completion"] * 0.35
     + ranking_df["customer_service"] * 0.35
 )
 
-ranking_df = ranking_df.sort_values("estimated_score", ascending=False)
+ranking_df["Performance Category"] = ranking_df["Estimated Score"].apply(lambda x: get_status(x)[0])
+
+department_options = ["Whole Hotel"] + sorted(ranking_df["Department"].unique().tolist())
+selected_department = st.selectbox("Filter rankings by department", department_options)
+
+if selected_department != "Whole Hotel":
+    ranking_df = ranking_df[ranking_df["Department"] == selected_department]
+
+ranking_df = ranking_df.sort_values("Estimated Score", ascending=False)
+
+def color_category(row):
+    status = row["Performance Category"]
+    if status == "Below Requirements":
+        return ["background-color: #ffcccc"] * len(row)
+    elif status == "Needs Improvement":
+        return ["background-color: #fff3cd"] * len(row)
+    else:
+        return ["background-color: #d4edda"] * len(row)
+
+display_df = ranking_df[
+    [
+        "Employee ID",
+        "Employee Name",
+        "Department",
+        "attendance",
+        "task_completion",
+        "customer_service",
+        "Estimated Score",
+        "Performance Category"
+    ]
+].rename(columns={
+    "attendance": "Attendance",
+    "task_completion": "Task Completion",
+    "customer_service": "Customer Service"
+})
 
 st.dataframe(
-    ranking_df[["name", "role", "attendance", "task_completion", "customer_service", "estimated_score"]],
-    use_container_width=True
+    display_df.style.apply(color_category, axis=1),
+    use_container_width=True,
+    hide_index=True
 )
 
-st.caption(
-    "Note: Promotion readiness and merit increase guidance are analytical estimates for portfolio demonstration purposes, not official HR decisions."
-)
+st.caption("Legend: Red = Below Requirements | Yellow = Needs Improvement | Green = At or Above Expectations.")
