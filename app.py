@@ -5,6 +5,7 @@ import pandas as pd
 import pickle
 import numpy as np
 import matplotlib.pyplot as plt
+from faker import Faker
 
 st.set_page_config(
     page_title="Service Excellence Prediction System",
@@ -39,24 +40,42 @@ conn.close()
 with open("employee_performance_model.pkl", "rb") as f:
     model = pickle.load(f)
 
-# Add real demo employee names and departments
-names = [
-    "Alicia Carter", "Marcus Johnson", "Taylor Brooks", "Jordan Williams",
-    "Sophia Martinez", "Brandon Lee", "Danielle Parker", "Christopher Allen",
-    "Maya Thompson", "Derrick Harris", "Natalie Reed", "Kevin Morgan",
-    "Jasmine Scott", "Anthony Bell", "Brianna Cooper", "Malik Robinson",
-    "Olivia Bennett", "Caleb Turner", "Naomi Foster", "Isaiah Mitchell"
-]
+# Add unique employee names and departments for portfolio display
+fake = Faker()
+Faker.seed(42)
+np.random.seed(42)
 
 departments = [
-    "Front Desk", "Housekeeping", "Maintenance", "Valet",
-    "Janitorial", "Restaurant", "Breakfast", "Guest Services"
+    "Front Desk",
+    "Housekeeping",
+    "Maintenance",
+    "Valet",
+    "Janitorial",
+    "Restaurant",
+    "Breakfast",
+    "Engineering",
+    "Sales",
+    "Events",
+    "Security",
+    "Management"
 ]
 
 employee_data = employee_data.reset_index(drop=True)
-employee_data["Employee ID"] = employee_data.index + 1001
-employee_data["Employee Name"] = [names[i % len(names)] for i in range(len(employee_data))]
-employee_data["Department"] = [departments[i % len(departments)] for i in range(len(employee_data))]
+
+employee_data["Employee ID"] = [
+    f"EMP-{1001 + i}"
+    for i in range(len(employee_data))
+]
+
+employee_data["Employee Name"] = [
+    fake.name()
+    for _ in range(len(employee_data))
+]
+
+employee_data["Department"] = [
+    np.random.choice(departments)
+    for _ in range(len(employee_data))
+]
 
 def get_status(score):
     if score < 70:
