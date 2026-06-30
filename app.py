@@ -239,14 +239,29 @@ if selected_department != "Whole Hotel":
 
 ranking_df = ranking_df.sort_values("Estimated Score", ascending=False)
 
-def color_category(row):
+def add_badge(row):
+    score = row["Estimated Score"]
     status = row["Performance Category"]
-    if status == "Below Requirements":
-        return ["background-color: #ffcccc"] * len(row)
+
+    if score >= 90:
+        return "🏆 Top Performer"
+    elif score >= 85:
+        return "⭐ Promotion Candidate"
     elif status == "Needs Improvement":
-        return ["background-color: #fff3cd"] * len(row)
+        return "⚠️ Coaching Needed"
     else:
-        return ["background-color: #d4edda"] * len(row)
+        return "🔴 Immediate Support"
+
+ranking_df["Talent Badge"] = ranking_df.apply(add_badge, axis=1)
+
+def color_status_cell(value):
+    if value == "Below Requirements":
+        return "background-color: #8B0000; color: white; font-weight: 700;"
+    elif value == "Needs Improvement":
+        return "background-color: #B8860B; color: black; font-weight: 700;"
+    elif value == "At or Above Expectations":
+        return "background-color: #006400; color: white; font-weight: 700;"
+    return ""
 
 display_df = ranking_df[
     [
@@ -257,7 +272,8 @@ display_df = ranking_df[
         "task_completion",
         "customer_service",
         "Estimated Score",
-        "Performance Category"
+        "Performance Category",
+        "Talent Badge"
     ]
 ].rename(columns={
     "attendance": "Attendance",
@@ -265,8 +281,13 @@ display_df = ranking_df[
     "customer_service": "Customer Service"
 })
 
+styled_df = display_df.style.map(
+    color_status_cell,
+    subset=["Performance Category"]
+)
+
 st.dataframe(
-    display_df.style.apply(color_category, axis=1),
+    styled_df,
     use_container_width=True,
     hide_index=True
 )
