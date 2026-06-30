@@ -160,7 +160,6 @@ with left:
     st.write(f"**Employee ID:** {employee['Employee ID']}")
     st.write(f"**Department:** {employee['Department']}")
     st.write(f"**Original Role:** {employee['role']}")
-    st.write(f"**Sex:** {employee['sex']}")
     st.write(f"**Age:** {employee['age']} years")
     st.write(f"**Start Date:** {employee['start_date']}")
     st.write(f"**Attendance:** {employee['attendance']}%")
